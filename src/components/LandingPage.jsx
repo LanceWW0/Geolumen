@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { MapPin, LineChart, Droplets, TrendingUp } from "lucide-react";
+import avatarImg from "../assets/me_snow.jpeg";
 
 /* ── Intersection Observer hook (trigger once) ─────────────── */
 
@@ -290,6 +291,115 @@ export default function LandingPage() {
               </div>
               <div className="text-sm text-slate-500">years of data</div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Why ─────────────────────────────────────────── */}
+      <section className="py-24 px-4 bg-slate-50">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2
+            className="text-3xl sm:text-4xl font-bold text-slate-900 mb-6"
+            style={{ fontFamily: "'DM Serif Display', serif" }}
+          >
+            Why this exists
+          </h2>
+          <p className="text-lg text-slate-600 leading-relaxed mb-6">
+            Water quality data in England is publicly available, but it's buried
+            in sprawling spreadsheets and technical reports that most people will
+            never read. Geolumen exists to change that — to take this complex,
+            fragmented data and make it something anyone can explore and
+            understand.
+          </p>
+          <p className="text-lg text-slate-600 leading-relaxed mb-6">
+            Whether you live near a river and want to know what's in it, or
+            you're curious about pollution trends in your area and what might be
+            causing them, this tool puts the answers within reach.
+          </p>
+          <p className="text-lg text-slate-600 leading-relaxed">
+            This is only the beginning. There's much more I want to build —
+            more data layers, deeper analysis, and new ways to understand the
+            health of England's waterways.
+          </p>
+        </div>
+      </section>
+
+      {/* ── Who ──────────────────────────────────────────── */}
+      <section className="py-24 px-4 bg-white">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2
+            className="text-3xl sm:text-4xl font-bold text-slate-900 mb-6"
+            style={{ fontFamily: "'DM Serif Display', serif" }}
+          >
+            Who's behind this
+          </h2>
+          <img
+            src={avatarImg}
+            alt="Laurence Wayne"
+            className="w-24 h-24 rounded-full object-cover mx-auto mb-6 shadow-md"
+          />
+          <p className="text-lg text-slate-600 leading-relaxed mb-6">
+            Geolumen is built by{" "}
+            <a
+              href="https://laurence-wayne.com/about"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-teal-600 hover:text-teal-800 underline transition-colors"
+            >
+              Laurence Wayne
+            </a>
+            , a developer passionate about environmental issues and finding
+            practical ways to solve them. Making hidden data visible is one
+            small step toward better understanding — and better outcomes — for
+            England's rivers.
+          </p>
+          <p className="text-lg text-slate-600 leading-relaxed mb-8">
+            Have questions, ideas, or feedback? I'd love to hear from you.
+          </p>
+          <div className="flex items-center justify-center gap-6">
+            <a
+              href="mailto:hello@laurence-wayne.com"
+              className="inline-flex items-center gap-2 text-teal-700 hover:text-teal-900 font-medium transition-colors"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect width="20" height="16" x="2" y="4" rx="2" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              </svg>
+              hello@laurence-wayne.com
+            </a>
+            <a
+              href="https://www.linkedin.com/in/laurencewayne/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-teal-700 hover:text-teal-900 font-medium transition-colors"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+                <rect width="4" height="12" x="2" y="9" />
+                <circle cx="4" cy="4" r="2" />
+              </svg>
+              LinkedIn
+            </a>
           </div>
         </div>
       </section>
