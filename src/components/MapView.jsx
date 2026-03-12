@@ -69,7 +69,7 @@ export default function MapView() {
 
     try {
       const firstRes = await fetch(
-        `/api/ea/water-quality/sampling-point?latitude=${center.lat}&longitude=${center.lng}&radius=${radius}&skip=0&limit=250`,
+        `/api/sampling-point?latitude=${center.lat}&longitude=${center.lng}&radius=${radius}&skip=0&limit=250`,
         {
           headers: {
             accept: "application/ld+json",
@@ -103,7 +103,7 @@ export default function MapView() {
           const results = await Promise.all(
             batch.map((skip) =>
               fetch(
-                `/api/ea/water-quality/sampling-point?latitude=${center.lat}&longitude=${center.lng}&radius=${radius}&skip=${skip}&limit=250`,
+                `/api/sampling-point?latitude=${center.lat}&longitude=${center.lng}&radius=${radius}&skip=${skip}&limit=250`,
                 {
                   headers: {
                     accept: "application/ld+json",
