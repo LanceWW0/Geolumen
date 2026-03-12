@@ -1,0 +1,319 @@
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
+import { MapPin, LineChart, Droplets, TrendingUp } from "lucide-react";
+
+/* ── Intersection Observer hook (trigger once) ─────────────── */
+
+function useReveal(threshold = 0.15) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          obs.unobserve(el);
+        }
+      },
+      { threshold }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+
+  return [ref, visible];
+}
+
+/* ── Animated counter hook ─────────────────────────────────── */
+
+function useCountUp(target, duration = 2000, start = false) {
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    if (!start) return;
+    let raf;
+    const t0 = performance.now();
+
+    function tick(now) {
+      const elapsed = now - t0;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out expo
+      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      setValue(Math.round(eased * target));
+      if (progress < 1) raf = requestAnimationFrame(tick);
+    }
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration, start]);
+
+  return value;
+}
+
+/* ── Feature cards data ────────────────────────────────────── */
+
+const features = [
+  {
+    icon: MapPin,
+    title: "Sampling Points",
+    description:
+      "Explore over 65,000 water quality monitoring locations across every river, lake, and estuary in England.",
+  },
+  {
+    icon: LineChart,
+    title: "Time Series Data",
+    description:
+      "View historical measurements visualised as interactive charts — spot patterns, seasonal cycles, and long-term shifts.",
+  },
+  {
+    icon: Droplets,
+    title: "Pollution Indicators",
+    description:
+      "Track key pollutants like ammonia, phosphates, and dissolved oxygen against official water quality thresholds.",
+  },
+  {
+    icon: TrendingUp,
+    title: "River Health Trends",
+    description:
+      "See how water quality has changed over decades and understand what's improving — and what isn't.",
+  },
+];
+
+/* ── Wave background component ─────────────────────────────── */
+
+function WaveBackground() {
+  return (
+    <div className="absolute bottom-0 left-0 right-0 overflow-hidden pointer-events-none" style={{ height: "40%" }}>
+      <svg
+        className="absolute bottom-0 w-full"
+        style={{ minWidth: "1200px", height: "100%" }}
+        viewBox="0 0 1440 320"
+        preserveAspectRatio="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M0,224 C240,280 480,160 720,200 C960,240 1200,180 1440,220 L1440,320 L0,320Z"
+          fill="#134e4a"
+          fillOpacity="0.05"
+        >
+          <animateTransform
+            attributeName="transform"
+            type="translate"
+            values="0,0; -80,0; 0,0"
+            dur="12s"
+            repeatCount="indefinite"
+          />
+        </path>
+        <path
+          d="M0,256 C180,200 420,300 720,240 C1020,180 1260,260 1440,230 L1440,320 L0,320Z"
+          fill="#0d9488"
+          fillOpacity="0.07"
+        >
+          <animateTransform
+            attributeName="transform"
+            type="translate"
+            values="0,0; 60,0; 0,0"
+            dur="8s"
+            repeatCount="indefinite"
+          />
+        </path>
+        <path
+          d="M0,280 C360,240 600,300 900,260 C1100,236 1320,280 1440,260 L1440,320 L0,320Z"
+          fill="#134e4a"
+          fillOpacity="0.04"
+        >
+          <animateTransform
+            attributeName="transform"
+            type="translate"
+            values="0,0; -40,0; 0,0"
+            dur="16s"
+            repeatCount="indefinite"
+          />
+        </path>
+      </svg>
+    </div>
+  );
+}
+
+/* ── Feature card component ────────────────────────────────── */
+
+function FeatureCard({ icon: Icon, title, description, delay, visible }) {
+  return (
+    <div
+      className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 transition-all duration-700 ease-out"
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(32px)",
+        transitionDelay: `${delay}ms`,
+      }}
+    >
+      <div className="w-12 h-12 rounded-xl bg-teal-50 flex items-center justify-center mb-4">
+        <Icon className="text-teal-700" size={24} />
+      </div>
+      <h3
+        className="text-lg font-semibold text-slate-900 mb-2"
+        style={{ fontFamily: "'DM Serif Display', serif" }}
+      >
+        {title}
+      </h3>
+      <p className="text-sm text-slate-600 leading-relaxed">{description}</p>
+    </div>
+  );
+}
+
+/* ── Stat block component ──────────────────────────────────── */
+
+function StatBlock({ value, suffix, label, visible }) {
+  return (
+    <div className="text-center px-4">
+      <div
+        className="text-4xl sm:text-5xl font-bold text-teal-900 mb-1 transition-opacity duration-700"
+        style={{
+          fontFamily: "'DM Serif Display', serif",
+          opacity: visible ? 1 : 0,
+        }}
+      >
+        {value.toLocaleString()}
+        {suffix}
+      </div>
+      <div className="text-sm text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+/* ── Main landing page ─────────────────────────────────────── */
+
+export default function LandingPage() {
+  const [featuresRef, featuresVisible] = useReveal(0.1);
+  const [statsRef, statsVisible] = useReveal(0.2);
+
+  const samplingPoints = useCountUp(65000, 2200, statsVisible);
+  const measurements = useCountUp(58000000, 2600, statsVisible);
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* ── Hero ─────────────────────────────────────────── */}
+      <section className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 overflow-hidden">
+        <WaveBackground />
+
+        <div className="relative z-10 max-w-3xl mx-auto pt-16">
+          <h1
+            className="text-4xl sm:text-5xl md:text-6xl font-bold text-slate-900 mb-6 leading-tight"
+            style={{ fontFamily: "'DM Serif Display', serif" }}
+          >
+            England's river health,
+            <br />
+            <span className="text-teal-700">made visible.</span>
+          </h1>
+
+          <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto mb-10 leading-relaxed">
+            Explore decades of water quality data from every river, lake, and
+            estuary in England — all in one place. No jargon, no paywalls, just
+            the data that matters.
+          </p>
+
+          <Link
+            to="/map"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-teal-800 text-white text-base font-medium rounded-full no-underline transition-all duration-300 hover:bg-teal-700 hover:shadow-lg hover:shadow-teal-900/20 hover:-translate-y-0.5"
+          >
+            Explore the map
+            <MapPin size={18} />
+          </Link>
+        </div>
+      </section>
+
+      {/* ── Features ─────────────────────────────────────── */}
+      <section className="py-24 px-4 bg-slate-50" ref={featuresRef}>
+        <div className="max-w-6xl mx-auto">
+          <h2
+            className="text-3xl sm:text-4xl font-bold text-slate-900 text-center mb-4"
+            style={{ fontFamily: "'DM Serif Display', serif" }}
+          >
+            What you can explore
+          </h2>
+          <p className="text-center text-slate-500 mb-16 max-w-xl mx-auto">
+            Open data from the Environment Agency, transformed into something
+            anyone can understand.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {features.map((f, i) => (
+              <FeatureCard
+                key={f.title}
+                {...f}
+                delay={i * 150}
+                visible={featuresVisible}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Stats ────────────────────────────────────────── */}
+      <section
+        className="py-24 px-4 bg-linear-to-b from-white to-teal-50/40"
+        ref={statsRef}
+      >
+        <div className="max-w-4xl mx-auto">
+          <h2
+            className="text-3xl sm:text-4xl font-bold text-slate-900 text-center mb-16"
+            style={{ fontFamily: "'DM Serif Display', serif" }}
+          >
+            The scale of the data
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-12">
+            <StatBlock
+              value={samplingPoints}
+              suffix="+"
+              label="sampling points"
+              visible={statsVisible}
+            />
+            <StatBlock
+              value={measurements}
+              suffix="+"
+              label="measurements"
+              visible={statsVisible}
+            />
+            <div className="text-center px-4">
+              <div
+                className="text-4xl sm:text-5xl font-bold text-teal-900 mb-1 transition-opacity duration-700"
+                style={{
+                  fontFamily: "'DM Serif Display', serif",
+                  opacity: statsVisible ? 1 : 0,
+                }}
+              >
+                2000–present
+              </div>
+              <div className="text-sm text-slate-500">years of data</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ───────────────────────────────────────── */}
+      <footer className="py-12 px-4 border-t border-slate-100">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-sm text-slate-400 mb-2">
+            Data provided by the{" "}
+            <a
+              href="https://environment.data.gov.uk/water-quality/view/landing"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-teal-600 hover:text-teal-800 underline transition-colors"
+            >
+              Environment Agency
+            </a>{" "}
+            via their open data API.
+          </p>
+          <p className="text-xs text-slate-300">
+            © {new Date().getFullYear()} Geolumen. Open-source and free to use.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
