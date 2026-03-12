@@ -77,7 +77,6 @@ const DETERMINAND_INFO = {
   },
 };
 
-// Priority order for display
 const DETERMINAND_PRIORITY = [
   "0111",
   "9901",
@@ -95,10 +94,8 @@ function parseObservations(members) {
     const code = obs.observedProperty?.notation;
     const name = obs.observedProperty?.prefLabel || code;
     const time = obs.phenomenonTime;
-    const unit =
-      obs.hasResult?.hasUnit?.prefLabel || obs.hasUnit || "";
+    const unit = obs.hasResult?.hasUnit?.prefLabel || obs.hasUnit || "";
 
-    // Use numericValue, fall back to upperBound (for "<X" readings)
     let value = obs.hasResult?.numericValue;
     if (value === null || value === undefined) {
       value = obs.hasResult?.upperBound;
@@ -106,12 +103,7 @@ function parseObservations(members) {
     if (value === null || value === undefined) continue;
 
     if (!grouped[code]) {
-      grouped[code] = {
-        code,
-        name,
-        unit,
-        data: [],
-      };
+      grouped[code] = { code, name, unit, data: [] };
     }
 
     grouped[code].data.push({
@@ -121,7 +113,6 @@ function parseObservations(members) {
     });
   }
 
-  // Sort each group by date
   for (const key of Object.keys(grouped)) {
     grouped[key].data.sort((a, b) => a.timestamp - b.timestamp);
   }
@@ -129,7 +120,83 @@ function parseObservations(members) {
   return grouped;
 }
 
-function DeterminandChart({ group }) {
+function sortGroups(groups) {
+  return Object.values(groups).sort((a, b) => {
+    const aIdx = DETERMINAND_PRIORITY.indexOf(a.code);
+    const bIdx = DETERMINAND_PRIORITY.indexOf(b.code);
+    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+    if (aIdx !== -1) return -1;
+    if (bIdx !== -1) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/* ── Animations ────────────────────────────────────────────── */
+
+const styleSheet = `
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+`;
+
+/* ── Skeleton loading placeholders ─────────────────────────── */
+
+function SkeletonBlock({ width, height, style = {} }) {
+  return (
+    <div
+      style={{
+        width,
+        height,
+        borderRadius: 6,
+        background:
+          "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)",
+        backgroundSize: "800px 100%",
+        animation: "shimmer 1.8s ease-in-out infinite",
+        ...style,
+      }}
+    />
+  );
+}
+
+function SkeletonChart({ delay = 0 }) {
+  return (
+    <div
+      style={{
+        marginBottom: 24,
+        animation: `fadeInUp 0.3s ease ${delay}ms both`,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 8,
+        }}
+      >
+        <div>
+          <SkeletonBlock width={140} height={14} />
+          <SkeletonBlock width={200} height={10} style={{ marginTop: 6 }} />
+        </div>
+        <SkeletonBlock width={50} height={28} />
+      </div>
+      <SkeletonBlock width="100%" height={140} style={{ borderRadius: 8 }} />
+      <SkeletonBlock width={120} height={10} style={{ marginTop: 6 }} />
+    </div>
+  );
+}
+
+/* ── Chart component ───────────────────────────────────────── */
+
+function DeterminandChart({ group, animDelay = 0, isStreaming }) {
   const info = DETERMINAND_INFO[group.code];
   const displayName = info?.name || group.name;
   const description = info?.description || "";
@@ -140,12 +207,10 @@ function DeterminandChart({ group }) {
   const latestDate =
     group.data.length > 0 ? group.data[group.data.length - 1].date : null;
 
-  // Determine status colour from thresholds
   let statusColor = "#6b7280";
   let statusLabel = "";
   if (thresholds.length > 0 && latestValue !== null) {
     if (info?.goodAbove) {
-      // Higher is better (e.g. dissolved oxygen)
       if (latestValue >= thresholds[0].value) {
         statusColor = "#22c55e";
         statusLabel = "Good";
@@ -157,7 +222,6 @@ function DeterminandChart({ group }) {
         statusLabel = "Poor";
       }
     } else {
-      // Lower is better (e.g. ammonia, BOD)
       const sorted = [...thresholds].sort((a, b) => a.value - b.value);
       statusColor = "#22c55e";
       statusLabel = "Good";
@@ -182,14 +246,16 @@ function DeterminandChart({ group }) {
 
   const formatDate = (timestamp) => {
     const d = new Date(timestamp);
-    return d.toLocaleDateString("en-GB", {
-      month: "short",
-      year: "2-digit",
-    });
+    return d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
   };
 
   return (
-    <div style={{ marginBottom: 24 }}>
+    <div
+      style={{
+        marginBottom: 24,
+        animation: `fadeInUp 0.35s ease ${animDelay}ms both`,
+      }}
+    >
       <div
         style={{
           display: "flex",
@@ -205,34 +271,35 @@ function DeterminandChart({ group }) {
               fontSize: 14,
               fontWeight: 600,
               color: "#1e293b",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
             {displayName}
+            {isStreaming && (
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "#3b82f6",
+                  animation: "pulse 1.2s ease-in-out infinite",
+                }}
+              />
+            )}
           </h4>
-          <p
-            style={{
-              margin: "2px 0 0",
-              fontSize: 11,
-              color: "#64748b",
-            }}
-          >
+          <p style={{ margin: "2px 0 0", fontSize: 11, color: "#64748b" }}>
             {description}
           </p>
         </div>
         {latestValue !== null && (
           <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
-            <span
-              style={{
-                fontSize: 18,
-                fontWeight: 700,
-                color: statusColor,
-              }}
-            >
+            <span style={{ fontSize: 18, fontWeight: 700, color: statusColor }}>
               {latestValue}
             </span>
-            <span
-              style={{ fontSize: 11, color: "#94a3b8", marginLeft: 4 }}
-            >
+            <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: 4 }}>
               {group.unit}
             </span>
             {statusLabel && (
@@ -297,10 +364,7 @@ function DeterminandChart({ group }) {
                   year: "numeric",
                 })
               }
-              formatter={(val) => [
-                `${val} ${group.unit}`,
-                displayName,
-              ]}
+              formatter={(val) => [`${val} ${group.unit}`, displayName]}
             />
             <Line
               type="monotone"
@@ -309,30 +373,31 @@ function DeterminandChart({ group }) {
               strokeWidth={1.5}
               dot={false}
               activeDot={{ r: 3, fill: "#3b82f6" }}
+              isAnimationActive={false}
             />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      <div
-        style={{
-          fontSize: 10,
-          color: "#94a3b8",
-          marginTop: 2,
-        }}
-      >
+      <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>
         {group.data.length} readings
         {latestDate &&
-          ` · Latest: ${new Date(latestDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`}
+          ` · Latest: ${new Date(latestDate).toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}`}
       </div>
     </div>
   );
 }
 
+/* ── Side panel ────────────────────────────────────────────── */
+
 export default function SidePanel({ point, onClose }) {
-  const [observations, setObservations] = useState(null);
+  const [observations, setObservations] = useState({});
   const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState({ loaded: 0, total: 0 });
   const abortRef = useRef(null);
 
   useEffect(() => {
@@ -343,8 +408,8 @@ export default function SidePanel({ point, onClose }) {
     abortRef.current = controller;
 
     setLoading(true);
-    setProgress(0);
-    setObservations(null);
+    setProgress({ loaded: 0, total: 0 });
+    setObservations({});
 
     async function fetchObservations() {
       try {
@@ -365,18 +430,18 @@ export default function SidePanel({ point, onClose }) {
           );
           const data = await res.json();
           total = data.totalItems || 0;
-          allMembers = [...allMembers, ...(data.member || [])];
+          const members = data.member || [];
+          allMembers = [...allMembers, ...members];
           skip += 250;
 
-          setProgress(
-            total > 0 ? Math.round((allMembers.length / total) * 100) : 100
-          );
+          setProgress({ loaded: allMembers.length, total });
 
-          if ((data.member || []).length < 250) break;
+          // Update charts progressively after each batch
+          const grouped = parseObservations(allMembers);
+          setObservations(grouped);
+
+          if (members.length < 250) break;
         }
-
-        const grouped = parseObservations(allMembers);
-        setObservations(grouped);
       } catch (err) {
         if (err.name !== "AbortError") {
           console.error("Error fetching observations:", err);
@@ -393,18 +458,12 @@ export default function SidePanel({ point, onClose }) {
   if (!point) return null;
 
   const isOpen = point.samplingPointStatus?.notation !== "C";
-
-  // Sort determinands: known ones first in priority order, then the rest
-  const sortedGroups = observations
-    ? Object.values(observations).sort((a, b) => {
-        const aIdx = DETERMINAND_PRIORITY.indexOf(a.code);
-        const bIdx = DETERMINAND_PRIORITY.indexOf(b.code);
-        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-        if (aIdx !== -1) return -1;
-        if (bIdx !== -1) return 1;
-        return a.name.localeCompare(b.name);
-      })
-    : [];
+  const sortedGroups = sortGroups(observations);
+  const pct =
+    progress.total > 0
+      ? Math.round((progress.loaded / progress.total) * 100)
+      : 0;
+  const hasCharts = sortedGroups.length > 0;
 
   return (
     <div
@@ -423,6 +482,8 @@ export default function SidePanel({ point, onClose }) {
           '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       }}
     >
+      <style>{styleSheet}</style>
+
       {/* Header */}
       <div
         style={{
@@ -450,13 +511,7 @@ export default function SidePanel({ point, onClose }) {
             >
               {point.prefLabel || point.altLabel}
             </h2>
-            <p
-              style={{
-                margin: "4px 0 0",
-                fontSize: 12,
-                color: "#64748b",
-              }}
-            >
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>
               {point.samplingPointType?.prefLabel}
             </p>
             <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
@@ -506,6 +561,54 @@ export default function SidePanel({ point, onClose }) {
             ✕
           </button>
         </div>
+
+        {/* Progress bar */}
+        {loading && (
+          <div style={{ marginTop: 12 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 4,
+              }}
+            >
+              <span style={{ fontSize: 11, color: "#64748b" }}>
+                Loading observations…
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "#94a3b8",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {progress.loaded.toLocaleString()}
+                {progress.total > 0 &&
+                  ` / ${progress.total.toLocaleString()}`}
+              </span>
+            </div>
+            <div
+              style={{
+                width: "100%",
+                height: 3,
+                background: "#e2e8f0",
+                borderRadius: 2,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${pct}%`,
+                  height: "100%",
+                  background: "linear-gradient(90deg, #3b82f6, #60a5fa)",
+                  borderRadius: 2,
+                  transition: "width 0.4s ease",
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -516,35 +619,27 @@ export default function SidePanel({ point, onClose }) {
           padding: "16px 20px",
         }}
       >
-        {loading && (
-          <div style={{ textAlign: "center", padding: "40px 0" }}>
-            <div
-              style={{
-                width: 160,
-                height: 4,
-                background: "#e2e8f0",
-                borderRadius: 2,
-                margin: "0 auto 12px",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  width: `${progress}%`,
-                  height: "100%",
-                  background: "#3b82f6",
-                  borderRadius: 2,
-                  transition: "width 0.3s ease",
-                }}
-              />
-            </div>
-            <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
-              Loading observations… {progress}%
-            </p>
-          </div>
+        {/* Real charts — appear progressively as data streams in */}
+        {sortedGroups.map((group, i) => (
+          <DeterminandChart
+            key={group.code}
+            group={group}
+            animDelay={i * 60}
+            isStreaming={loading}
+          />
+        ))}
+
+        {/* Skeleton placeholders while waiting for first batch */}
+        {loading && !hasCharts && (
+          <>
+            <SkeletonChart delay={0} />
+            <SkeletonChart delay={100} />
+            <SkeletonChart delay={200} />
+          </>
         )}
 
-        {!loading && sortedGroups.length === 0 && (
+        {/* Empty state */}
+        {!loading && !hasCharts && (
           <div
             style={{
               textAlign: "center",
@@ -556,11 +651,6 @@ export default function SidePanel({ point, onClose }) {
             No observation data available for this site.
           </div>
         )}
-
-        {!loading &&
-          sortedGroups.map((group) => (
-            <DeterminandChart key={group.code} group={group} />
-          ))}
       </div>
     </div>
   );
