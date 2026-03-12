@@ -11,13 +11,13 @@ import MarkerClusterGroup from "react-leaflet-markercluster";
 import "leaflet/dist/leaflet.css";
 import "react-leaflet-markercluster/styles";
 import { bngToLatLng } from "./utils/coords";
+import SidePanel from "./components/SidePanel";
 
 function MapEvents({ onBoundsChange }) {
   const map = useMap();
   const timeoutRef = useRef(null);
   const hasFired = useRef(false);
 
-  // Fire on initial load
   useEffect(() => {
     if (!hasFired.current) {
       hasFired.current = true;
@@ -39,6 +39,7 @@ function App() {
   const [points, setPoints] = useState({});
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState("");
+  const [selectedPoint, setSelectedPoint] = useState(null);
   const abortRef = useRef(null);
 
   const fetchPoints = useCallback(async (map) => {
@@ -116,7 +117,6 @@ function App() {
           for (const data of results) {
             allMembers = [...allMembers, ...(data.member || [])];
           }
-
           setProgress(`${Math.round((allMembers.length / total) * 100)}%`);
         }
       }
@@ -141,7 +141,7 @@ function App() {
   const pointsArray = Object.values(points);
 
   return (
-    <div style={{ height: "100vh", width: "100%" }}>
+    <div style={{ height: "100vh", width: "100%", position: "relative" }}>
       {progress && (
         <div
           style={{
@@ -157,11 +157,14 @@ function App() {
             fontSize: 14,
             minWidth: 60,
             textAlign: "center",
+            fontFamily:
+              '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
           }}
         >
           {progress.endsWith("%") ? `Loading… ${progress}` : progress}
         </div>
       )}
+
       <MapContainer
         center={[54.97, -1.61]}
         zoom={10}
@@ -183,28 +186,43 @@ function App() {
             if (!coords) return null;
 
             const isOpen = point.samplingPointStatus?.notation !== "C";
+            const isSelected =
+              selectedPoint?.notation === point.notation;
 
             return (
               <CircleMarker
                 key={point.notation || i}
                 center={coords}
-                radius={6}
-                color={isOpen ? "#2563eb" : "#9ca3af"}
-                fillColor={isOpen ? "#3b82f6" : "#d1d5db"}
-                fillOpacity={0.7}
-              >
-                <Popup>
-                  <strong>{point.prefLabel || point.altLabel}</strong>
-                  <br />
-                  {point.samplingPointType?.prefLabel}
-                  <br />
-                  <em>{isOpen ? "Active" : "Closed"}</em>
-                </Popup>
-              </CircleMarker>
+                radius={isSelected ? 9 : 6}
+                color={
+                  isSelected
+                    ? "#1d4ed8"
+                    : isOpen
+                      ? "#2563eb"
+                      : "#9ca3af"
+                }
+                fillColor={
+                  isSelected
+                    ? "#2563eb"
+                    : isOpen
+                      ? "#3b82f6"
+                      : "#d1d5db"
+                }
+                fillOpacity={isSelected ? 1 : 0.7}
+                weight={isSelected ? 3 : 1}
+                eventHandlers={{
+                  click: () => setSelectedPoint(point),
+                }}
+              />
             );
           })}
         </MarkerClusterGroup>
       </MapContainer>
+
+      <SidePanel
+        point={selectedPoint}
+        onClose={() => setSelectedPoint(null)}
+      />
     </div>
   );
 }

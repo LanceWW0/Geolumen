@@ -1,0 +1,567 @@
+import { useEffect, useState, useRef } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
+
+// Key determinands the public would care about, with WFD-style thresholds
+const DETERMINAND_INFO = {
+  "0111": {
+    name: "Ammonia",
+    unit: "mg/l",
+    description: "Sewage & pollution indicator. Lower is better.",
+    thresholds: [
+      { value: 0.3, label: "High (Good)", color: "#22c55e" },
+      { value: 0.6, label: "Good", color: "#84cc16" },
+      { value: 1.1, label: "Moderate", color: "#eab308" },
+      { value: 2.5, label: "Poor", color: "#f97316" },
+    ],
+    badAbove: 2.5,
+  },
+  "0076": {
+    name: "Water Temperature",
+    unit: "°C",
+    description: "Affects dissolved oxygen and aquatic life.",
+    thresholds: [],
+  },
+  "0085": {
+    name: "BOD (Biochemical Oxygen Demand)",
+    unit: "mg/l",
+    description: "Organic pollution. Lower is better.",
+    thresholds: [
+      { value: 4, label: "Good", color: "#22c55e" },
+      { value: 6, label: "Moderate", color: "#eab308" },
+      { value: 7.5, label: "Poor", color: "#f97316" },
+    ],
+    badAbove: 7.5,
+  },
+  "0117": {
+    name: "Nitrate",
+    unit: "mg/l",
+    description: "Agricultural runoff indicator. High levels harm ecosystems.",
+    thresholds: [],
+  },
+  "0180": {
+    name: "Orthophosphate",
+    unit: "mg/l",
+    description: "Causes algal blooms. Lower is better.",
+    thresholds: [
+      { value: 0.036, label: "High (Good)", color: "#22c55e" },
+      { value: 0.069, label: "Good", color: "#84cc16" },
+      { value: 0.174, label: "Moderate", color: "#eab308" },
+      { value: 0.466, label: "Poor", color: "#f97316" },
+    ],
+    badAbove: 0.466,
+  },
+  "9901": {
+    name: "Dissolved Oxygen",
+    unit: "% saturation",
+    description: "Essential for aquatic life. Higher is better.",
+    thresholds: [
+      { value: 80, label: "Good", color: "#22c55e" },
+      { value: 60, label: "Moderate", color: "#eab308" },
+      { value: 50, label: "Poor", color: "#f97316" },
+    ],
+    goodAbove: 80,
+  },
+  "0061": {
+    name: "pH",
+    unit: "pH units",
+    description: "Acidity/alkalinity. Rivers are typically 6.5–8.5.",
+    thresholds: [],
+  },
+};
+
+// Priority order for display
+const DETERMINAND_PRIORITY = [
+  "0111",
+  "9901",
+  "0085",
+  "0180",
+  "0117",
+  "0076",
+  "0061",
+];
+
+function parseObservations(members) {
+  const grouped = {};
+
+  for (const obs of members) {
+    const code = obs.observedProperty?.notation;
+    const name = obs.observedProperty?.prefLabel || code;
+    const time = obs.phenomenonTime;
+    const unit =
+      obs.hasResult?.hasUnit?.prefLabel || obs.hasUnit || "";
+
+    // Use numericValue, fall back to upperBound (for "<X" readings)
+    let value = obs.hasResult?.numericValue;
+    if (value === null || value === undefined) {
+      value = obs.hasResult?.upperBound;
+    }
+    if (value === null || value === undefined) continue;
+
+    if (!grouped[code]) {
+      grouped[code] = {
+        code,
+        name,
+        unit,
+        data: [],
+      };
+    }
+
+    grouped[code].data.push({
+      date: time,
+      timestamp: new Date(time).getTime(),
+      value: parseFloat(value),
+    });
+  }
+
+  // Sort each group by date
+  for (const key of Object.keys(grouped)) {
+    grouped[key].data.sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  return grouped;
+}
+
+function DeterminandChart({ group }) {
+  const info = DETERMINAND_INFO[group.code];
+  const displayName = info?.name || group.name;
+  const description = info?.description || "";
+  const thresholds = info?.thresholds || [];
+
+  const latestValue =
+    group.data.length > 0 ? group.data[group.data.length - 1].value : null;
+  const latestDate =
+    group.data.length > 0 ? group.data[group.data.length - 1].date : null;
+
+  // Determine status colour from thresholds
+  let statusColor = "#6b7280";
+  let statusLabel = "";
+  if (thresholds.length > 0 && latestValue !== null) {
+    if (info?.goodAbove) {
+      // Higher is better (e.g. dissolved oxygen)
+      if (latestValue >= thresholds[0].value) {
+        statusColor = "#22c55e";
+        statusLabel = "Good";
+      } else if (latestValue >= thresholds[1].value) {
+        statusColor = "#eab308";
+        statusLabel = "Moderate";
+      } else {
+        statusColor = "#ef4444";
+        statusLabel = "Poor";
+      }
+    } else {
+      // Lower is better (e.g. ammonia, BOD)
+      const sorted = [...thresholds].sort((a, b) => a.value - b.value);
+      statusColor = "#22c55e";
+      statusLabel = "Good";
+      for (const t of sorted) {
+        if (latestValue > t.value) {
+          statusColor =
+            t.color === "#22c55e" || t.color === "#84cc16"
+              ? "#eab308"
+              : t.color === "#eab308"
+                ? "#f97316"
+                : "#ef4444";
+          statusLabel =
+            t.color === "#22c55e" || t.color === "#84cc16"
+              ? "Moderate"
+              : t.color === "#eab308"
+                ? "Poor"
+                : "Bad";
+        }
+      }
+    }
+  }
+
+  const formatDate = (timestamp) => {
+    const d = new Date(timestamp);
+    return d.toLocaleDateString("en-GB", {
+      month: "short",
+      year: "2-digit",
+    });
+  };
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 4,
+        }}
+      >
+        <div>
+          <h4
+            style={{
+              margin: 0,
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#1e293b",
+            }}
+          >
+            {displayName}
+          </h4>
+          <p
+            style={{
+              margin: "2px 0 0",
+              fontSize: 11,
+              color: "#64748b",
+            }}
+          >
+            {description}
+          </p>
+        </div>
+        {latestValue !== null && (
+          <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
+            <span
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                color: statusColor,
+              }}
+            >
+              {latestValue}
+            </span>
+            <span
+              style={{ fontSize: 11, color: "#94a3b8", marginLeft: 4 }}
+            >
+              {group.unit}
+            </span>
+            {statusLabel && (
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: statusColor,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {statusLabel}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={{ width: "100%", height: 140 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={group.data}
+            margin={{ top: 8, right: 8, bottom: 0, left: -20 }}
+          >
+            <XAxis
+              dataKey="timestamp"
+              tickFormatter={formatDate}
+              tick={{ fontSize: 10, fill: "#94a3b8" }}
+              axisLine={{ stroke: "#e2e8f0" }}
+              tickLine={false}
+              minTickGap={40}
+            />
+            <YAxis
+              tick={{ fontSize: 10, fill: "#94a3b8" }}
+              axisLine={false}
+              tickLine={false}
+              width={50}
+            />
+            {thresholds.map((t, i) => (
+              <ReferenceLine
+                key={i}
+                y={t.value}
+                stroke={t.color}
+                strokeDasharray="4 4"
+                strokeWidth={1}
+              />
+            ))}
+            <Tooltip
+              contentStyle={{
+                fontSize: 12,
+                background: "#1e293b",
+                border: "none",
+                borderRadius: 6,
+                color: "#f1f5f9",
+                padding: "6px 10px",
+              }}
+              labelFormatter={(ts) =>
+                new Date(ts).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              }
+              formatter={(val) => [
+                `${val} ${group.unit}`,
+                displayName,
+              ]}
+            />
+            <Line
+              type="monotone"
+              dataKey="value"
+              stroke="#3b82f6"
+              strokeWidth={1.5}
+              dot={false}
+              activeDot={{ r: 3, fill: "#3b82f6" }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div
+        style={{
+          fontSize: 10,
+          color: "#94a3b8",
+          marginTop: 2,
+        }}
+      >
+        {group.data.length} readings
+        {latestDate &&
+          ` · Latest: ${new Date(latestDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`}
+      </div>
+    </div>
+  );
+}
+
+export default function SidePanel({ point, onClose }) {
+  const [observations, setObservations] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const abortRef = useRef(null);
+
+  useEffect(() => {
+    if (!point) return;
+
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setLoading(true);
+    setProgress(0);
+    setObservations(null);
+
+    async function fetchObservations() {
+      try {
+        let allMembers = [];
+        let skip = 0;
+        let total = Infinity;
+
+        while (skip < total) {
+          const res = await fetch(
+            `/api/ea/water-quality/sampling-point/${point.notation}/observation?skip=${skip}&limit=250`,
+            {
+              headers: {
+                accept: "application/ld+json",
+                "API-Version": "1",
+              },
+              signal: controller.signal,
+            }
+          );
+          const data = await res.json();
+          total = data.totalItems || 0;
+          allMembers = [...allMembers, ...(data.member || [])];
+          skip += 250;
+
+          setProgress(
+            total > 0 ? Math.round((allMembers.length / total) * 100) : 100
+          );
+
+          if ((data.member || []).length < 250) break;
+        }
+
+        const grouped = parseObservations(allMembers);
+        setObservations(grouped);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("Error fetching observations:", err);
+        }
+      }
+      setLoading(false);
+    }
+
+    fetchObservations();
+
+    return () => controller.abort();
+  }, [point]);
+
+  if (!point) return null;
+
+  const isOpen = point.samplingPointStatus?.notation !== "C";
+
+  // Sort determinands: known ones first in priority order, then the rest
+  const sortedGroups = observations
+    ? Object.values(observations).sort((a, b) => {
+        const aIdx = DETERMINAND_PRIORITY.indexOf(a.code);
+        const bIdx = DETERMINAND_PRIORITY.indexOf(b.code);
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        if (aIdx !== -1) return -1;
+        if (bIdx !== -1) return 1;
+        return a.name.localeCompare(b.name);
+      })
+    : [];
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        right: 0,
+        width: 420,
+        height: "100%",
+        background: "#ffffff",
+        zIndex: 1000,
+        boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",
+        display: "flex",
+        flexDirection: "column",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          padding: "16px 20px",
+          borderBottom: "1px solid #e2e8f0",
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: 16,
+                fontWeight: 700,
+                color: "#0f172a",
+                lineHeight: 1.3,
+              }}
+            >
+              {point.prefLabel || point.altLabel}
+            </h2>
+            <p
+              style={{
+                margin: "4px 0 0",
+                fontSize: 12,
+                color: "#64748b",
+              }}
+            >
+              {point.samplingPointType?.prefLabel}
+            </p>
+            <div style={{ marginTop: 6, display: "flex", gap: 6 }}>
+              <span
+                style={{
+                  display: "inline-block",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "2px 8px",
+                  borderRadius: 99,
+                  background: isOpen ? "#dcfce7" : "#f3f4f6",
+                  color: isOpen ? "#166534" : "#6b7280",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {isOpen ? "Active" : "Closed"}
+              </span>
+              <span
+                style={{
+                  display: "inline-block",
+                  fontSize: 10,
+                  fontWeight: 500,
+                  padding: "2px 8px",
+                  borderRadius: 99,
+                  background: "#f1f5f9",
+                  color: "#475569",
+                }}
+              >
+                {point.region?.prefLabel}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 4,
+              fontSize: 20,
+              color: "#94a3b8",
+              lineHeight: 1,
+              marginLeft: 8,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "16px 20px",
+        }}
+      >
+        {loading && (
+          <div style={{ textAlign: "center", padding: "40px 0" }}>
+            <div
+              style={{
+                width: 160,
+                height: 4,
+                background: "#e2e8f0",
+                borderRadius: 2,
+                margin: "0 auto 12px",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${progress}%`,
+                  height: "100%",
+                  background: "#3b82f6",
+                  borderRadius: 2,
+                  transition: "width 0.3s ease",
+                }}
+              />
+            </div>
+            <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
+              Loading observations… {progress}%
+            </p>
+          </div>
+        )}
+
+        {!loading && sortedGroups.length === 0 && (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "40px 0",
+              color: "#94a3b8",
+              fontSize: 14,
+            }}
+          >
+            No observation data available for this site.
+          </div>
+        )}
+
+        {!loading &&
+          sortedGroups.map((group) => (
+            <DeterminandChart key={group.code} group={group} />
+          ))}
+      </div>
+    </div>
+  );
+}
