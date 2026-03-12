@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import logoImg from "../assets/logo.png";
 
 export default function Navbar() {
   const { pathname } = useLocation();
@@ -20,9 +21,10 @@ export default function Navbar() {
           {/* Logo */}
           <Link
             to="/"
-            className="text-xl tracking-tight no-underline"
+            className="flex items-center gap-2 text-xl tracking-tight no-underline"
             style={{ fontFamily: "'DM Serif Display', serif", color: "#134e4a" }}
           >
+            <img src={logoImg} alt="Geolumen logo" className="h-8 w-8" />
             Geolumen
           </Link>
 
