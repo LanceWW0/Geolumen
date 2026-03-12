@@ -532,10 +532,11 @@ export default function SidePanel({ point, onClose }) {
     <div
       style={{
         position: "absolute",
-        top: 0,
+        top: "4rem",
         right: 0,
         width: 420,
-        height: "100%",
+        maxWidth: "100%",
+        height: "calc(100% - 4rem)",
         background: "#ffffff",
         zIndex: 1000,
         boxShadow: "-4px 0 24px rgba(0,0,0,0.12)",

@@ -12,6 +12,7 @@ import "leaflet/dist/leaflet.css";
 import "react-leaflet-markercluster/styles";
 import { bngToLatLng } from "../utils/coords";
 import SidePanel from "./SidePanel";
+import avatarImg from "../assets/me_snow.jpeg";
 
 function MapEvents({ onBoundsChange }) {
   const map = useMap();
@@ -141,7 +142,7 @@ export default function MapView() {
   const pointsArray = Object.values(points);
 
   return (
-    <div style={{ height: "calc(100vh - 4rem)", width: "100%", position: "relative", marginTop: "4rem" }}>
+    <div style={{ height: "100vh", width: "100%", position: "relative", paddingTop: "4rem", boxSizing: "border-box", overflow: "hidden" }}>
       {progress && (
         <div
           style={{
@@ -223,6 +224,45 @@ export default function MapView() {
         point={selectedPoint}
         onClose={() => setSelectedPoint(null)}
       />
+
+      <div
+        style={{
+          position: "absolute",
+          bottom: 16,
+          left: 16,
+          zIndex: 1000,
+          background: "white",
+          padding: "6px 12px 6px 6px",
+          borderRadius: 9999,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          fontSize: 13,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          color: "#475569",
+        }}
+      >
+        <img
+          src={avatarImg}
+          alt="Laurence Wayne"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            objectFit: "cover",
+          }}
+        />
+        Made with <span style={{ color: "#ef4444" }}>♥</span> by{" "}
+        <a
+          href="https://laurence-wayne.com/about"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "#0d9488", textDecoration: "none", fontWeight: 500 }}
+        >
+          Laurence
+        </a>
+      </div>
     </div>
   );
 }
